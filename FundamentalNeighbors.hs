@@ -69,7 +69,9 @@ rsum (h : t) = foldl (+) h t
 -}
 lunions :: (Eq a) => [[a]] -> [a]
 lunions []       = []
-lunions (h : t)  = Data.List.union (nub h) (lunions t)
+{- lunions (h : t)  = Data.List.union (nub h) (lunions t)
+-}
+lunions x = nub (concat x)
 
 
 {-
@@ -94,7 +96,7 @@ lunions (h : t)  = Data.List.union (nub h) (lunions t)
 pOrth :: Integer -> Rational -> [Cyclotome] -> Bool
 pOrth p e x = (upper $ head t) <= e
               where s = (cycloOne p) + (rsum x)
-                    a = [boundMag2 (4 * k) s | k <- [1 ..]]
+                    a = [boundMag2 k s | k <- [1 ..]]
                     {- t is a list of bounds that clearly distinguish |x|^2 and e -}
                     t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
 
@@ -108,8 +110,8 @@ pOrth p e x = (upper $ head t) <= e
 pBias :: Integer -> Rational -> [Cyclotome] -> Bool
 pBias p e x = (upper $ head t) <= e
               where s = (cycloOne p) + (rsum x)
-                    a = [abs((boundMag2 (4 * k) s) - (Bound 6 6)) | k <- [1 ..]]
-                    {- t is a list of bounds that clearly distinguish |x|^2 and e -}
+                    a = [abs(boundPlus (boundMag2 k s) (-6)) | k <- [1 ..]]
+                    {- t is a list of bounds that clearly distinguish ||x|^2-6| and e -}
                     t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
 
 

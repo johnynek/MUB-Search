@@ -4,7 +4,7 @@
   by hand
 -}
 
-module Bound (Bound(..), boundContains, toTuple) where
+module Bound (Bound(..), boundPlus, boundTimes, boundContains) where
 
 data (Ord a) => Bound a = Bound { lower :: a, upper :: a } | Unbounded
              deriving (Show, Eq)
@@ -12,7 +12,13 @@ data (Ord a) => Bound a = Bound { lower :: a, upper :: a } | Unbounded
 boundContains :: (Ord a) => Bound a -> a -> Bool
 boundContains Unbounded _ = True
 boundContains (Bound x y) z = (x <= z) && (z <= y)
-toTuple (Bound x y) = (x, y)
+
+boundPlus (Bound x y) z = Bound (x+z) (y+z)
+boundPlus Unbounded _ = Unbounded
+
+boundTimes (Bound x y) z | z >= (fromInteger 0) = Bound (x*z) (y*z)
+                         | otherwise = Bound (y*z) (x*z)
+boundTimes Unbounded _ = Unbounded
 
 instance (Ord a, Num a) => Num (Bound a) where
   signum _ = undefined
@@ -32,8 +38,21 @@ instance (Ord a, Num a) => Num (Bound a) where
 
   {- Here's how to multiply bounds -}
   {- Bound with everything -}
+  (Bound x y) * (Bound z w) | x >= 0 && z >= 0 = Bound (x*z) (y*w) {- lower bounds are positive -}
+{-
+                            | x == y = if x >= (fromInteger 0)
+                                       then Bound (x*z) (x*w) {- common case -}
+                                       else Bound (x*w) (x*z)
+                            | z == w = if z >= (fromInteger 0)
+                                       then Bound (x*z) (y*z) {- common case -}
+                                       else Bound (y*z) (x*z)
+-}
+                            | otherwise = Bound (minimum all) (maximum all)
+                                          where all = [ x*z, x*w, y*z, y*w ]
+{- Simple version tends to be a bit slow 
   (Bound x y) * (Bound z w) = Bound (minimum all) (maximum all)
                               where all = [ x*z, x*w, y*z, y*w ]
+-}
   Unbounded * _ = Unbounded 
   _ * Unbounded = Unbounded 
    

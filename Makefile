@@ -10,7 +10,7 @@
 # PROF is for any profiling information.
 #
 CC = ghc
-FLAGS = -XFlexibleInstances -XFlexibleContexts -static -optl-static -optl-pthread
+FLAGS = -XFlexibleInstances -XFlexibleContexts -static -optl-static -optl-pthread -fforce-recomp -O -O2 -optc-O2 -optc-O3 -fexcess-precision
 PROF = -prof -auto-all
 
 
