@@ -38,7 +38,10 @@ push:
 
 # Modules that provide specific encapsulated functionalities.
 #
-Cyclotomic: Cyclotomic.hs
+Bound.o: Bound.hs
+	$(CC) -c Bound.hs $(FLAGS) $(PACKAGES) $(PROF)
+
+Cyclotomic: Cyclotomic.hs Bound.o
 	$(CC) -c Cyclotomic.hs $(FLAGS) $(PACKAGES) $(PROF)
 
 Perms: Perms.hs
@@ -71,8 +74,8 @@ EquivBases: EquivBases.hs Perms
 
 # The big boys.
 #
-FundamentalNeighbors: FundamentalNeighbors.hs Cyclotomic SublistPred Combinadics Perms
-	$(CC) -o FundamentalNeighbors FundamentalNeighbors.hs Cyclotomic.o SublistPred.o Combinadics.o Perms.o $(FLAGS) $(PACKAGES) $(PROF)
+FundamentalNeighbors: FundamentalNeighbors.hs Cyclotomic SublistPred Combinadics Perms Bound.o
+	$(CC) -o FundamentalNeighbors FundamentalNeighbors.hs Cyclotomic.o Bound.o SublistPred.o Combinadics.o Perms.o $(FLAGS) $(PACKAGES) $(PROF)
 
 Simplify: Simplify.hs
 	$(CC) -o Simplify Simplify.hs $(FLAGS) $(PACKAGES) $(PROF)

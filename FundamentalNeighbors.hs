@@ -27,6 +27,7 @@ import Data.Maybe
 import SublistPred
 import Cyclotomic
 import Perms
+import Bound
 
 
 {-
@@ -84,31 +85,32 @@ lunions (h : t)  = Data.List.union (nub h) (lunions t)
   iteration.  a defines these bounds (an infinite list of tuples).
 
   Third, we filter this list to only include those bounds that are tight enough
-  to definitively decide ||x||^2 <= e; that is, those whose lower bound is
+  to definitively decide ||x||^2 < e; that is, those whose lower bound is
   greater than e and those whose upper bound is less than or equal to e.  t
   defines these bounds (an infinite list of tuples).
 
   We decide ||x||^2 <= e using the first of these vetted bounds.
 -}
 pOrth :: Integer -> Rational -> [Cyclotome] -> Bool
-pOrth p e x = (snd $ head t) <= e
+pOrth p e x = (upper $ head t) <= e
               where s = (cycloOne p) + (rsum x)
                     a = [boundMag2 (4 * k) s | k <- [1 ..]]
-                    t = filter (\ b -> ((fst b) > e) || ((snd b) <= e)) a
+                    {- t is a list of bounds that clearly distinguish |x|^2 and e -}
+                    t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
 
 
 {-
   Predicate that determines if a vector is unbiased to the unity vector.
 
   This function works identically to pOrth, except that we are deciding
-  | ||x||^2 - 6 | <= e.
+  | ||x||^2 - 6 | < e.
 -}
 pBias :: Integer -> Rational -> [Cyclotome] -> Bool
-pBias p e x = (snd $ head t) <= e
+pBias p e x = (upper $ head t) <= e
               where s = (cycloOne p) + (rsum x)
-                    a = [tupleAdjust (boundMag2 (4 * k) s) | k <- [1 ..]]
-                    tupleAdjust (f, s) = (abs(6 - f), abs(6 - s))
-                    t = filter (\ b -> ((fst b) > e) || ((snd b) <= e)) a
+                    a = [abs((boundMag2 (4 * k) s) - (Bound 6 6)) | k <- [1 ..]]
+                    {- t is a list of bounds that clearly distinguish |x|^2 and e -}
+                    t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
 
 
 {-

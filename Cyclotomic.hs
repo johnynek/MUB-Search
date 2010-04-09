@@ -10,7 +10,9 @@
 
 module Cyclotomic (Cyclotome, approx, boundMag2, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
 
+import Bound
 import Ratio
+import Data.List(genericIndex)
 import Complex(Complex)
 
 
@@ -141,83 +143,67 @@ approx (CycloRat x) = fromRational x
 approx (CycloVal x gamma y) = (approx x) + (sqrt $ approx gamma) * (approx y)
 
 
-
 {-
   kth iteration of converging upper and lower rational bounds on the magnitude
   squared of a cyclotome.
 -}
-boundMag2 k c = ((fst r)^2 + (fst i)^2, (snd r)^2 + (snd i)^2)
+boundMag2 k c = r*r + i*i
                 where r = boundReal k c
                       i = boundImag k c
-
-
 
 {-
   kth iteration of converging lower and upper rational bounds on the real part
   of the square root of gamma in a cyclotome.
+  Re(\sqrt{a+ib}) = \sqrt{(r+a)/2}
+  Im(\sqrt{a+ib}) = b/\sqrt{2(r+a)}
+  if |r| = 1, we have the below:
 -}
-boundRealOmega k (CycloVal (CycloRat x) (CycloRat (-1)) (CycloRat y)) = (0, 0)
-boundRealOmega k (CycloVal x gamma y) = (l, u)
-                                        where l = fst $ boundSqrt k $ (1 + (fst $ boundReal k gamma)) / 2
-                                              u = snd $ boundSqrt k $ (1 + (snd $ boundReal k gamma)) / 2
-
-
-
+boundRealOmega k (CycloVal (CycloRat x) (CycloRat (-1)) (CycloRat y)) = Bound 0 0 {- case of \Im( \sqrt{ -1 } ) -}
+boundRealOmega k (CycloVal x gamma y) = boundSqrtB k ( (r+a)/two ) 
+                                        where a = boundReal k gamma
+                                              r = Bound 1 1
+                                              two = Bound 2 2
 {-
   kth iteration of converging lower and upper rational bounds on the imaginary
   part of the square root of gamma in a cyclotome.
+  Im(\sqrt{a+ib}) = b/\sqrt{2(r+a)}
 -}
-boundImagOmega k (CycloVal (CycloRat x) (CycloRat (-1)) (CycloRat y)) = (1, 1)
-boundImagOmega k (CycloVal x gamma y) = (l, u)
-                                        where l = (fst $ boundImag k gamma) / (snd $ boundSqrt k (2 + 2 * (snd $ boundReal k gamma)))
-                                              u = (snd $ boundImag k gamma) / (fst $ boundSqrt k (2 + 2 * (fst $ boundReal k gamma)))
-
-
-
+boundImagOmega k (CycloVal (CycloRat x) (CycloRat (-1)) (CycloRat y)) = Bound 1 1 {- case of \Im( \sqrt{ -1 } ) -}
+boundImagOmega k (CycloVal x gamma y) = b / (boundSqrtB k (two * (r+a))) 
+                                        where b = boundImag k gamma
+                                              a = boundReal k gamma
+                                              r = Bound 1 1 {- |gamma| = 1 -} 
+                                              two = Bound 2 2
 {-
   kth iteration of converging lower and upper bounds on the real part of
   a cyclotome.
+  Re(a*b) = Re(a)Re(b) - Im(a)Im(b)
 -}
-boundReal k (CycloRat x) = (x, x)
-boundReal k (CycloVal x gamma y) = (min, max)
+boundReal k (CycloRat x) = Bound x x {- Simple case of a real rational number -}
+boundReal k (CycloVal x gamma y) = a + b*c - d*e
                                    where a  = boundReal k x
                                          b  = boundReal k y
                                          c  = boundRealOmega k (CycloVal x gamma y)
                                          d  = boundImag k y
                                          e  = boundImagOmega k (CycloVal x gamma y)
-                                         min = (fst a) + (minimum valsBC) - (maximum valsDE)
-                                         max = (snd a) + (maximum valsBC) - (minimum valsDE)
-                                         valsBC = [(fst b) * (fst c), (fst b) * (snd c), (snd b) * (fst c), (snd b) * (snd c)]
-                                         valsDE = [(fst d) * (fst e), (fst d) * (snd e), (snd d) * (fst e), (snd d) * (snd e)]
-
-
-
 {-
   kth iteration of converging lower and upper bounds on the imaginary part of
   a cyclotome.
+  Im(a*b) = Re(a)Im(b) + Im(a)Re(b)
 -}
-boundImag k (CycloRat x) = (0, 0)
-boundImag k (CycloVal x gamma y) = (min, max)
+boundImag k (CycloRat x) = Bound 0 0 {- Simple case of a real rational-> no imag. -}
+boundImag k (CycloVal x gamma y) = a + b*c + d*e 
                                    where a  = boundImag k x
                                          b  = boundImag k y
                                          c  = boundRealOmega k (CycloVal x gamma y)
                                          d  = boundReal k y
                                          e  = boundImagOmega k (CycloVal x gamma y)
-                                         min = (fst a) + (minimum valsBC) + (minimum valsDE)
-                                         max = (snd a) + (maximum valsBC) + (maximum valsDE)
-                                         valsBC = [(fst b) * (fst c), (fst b) * (snd c), (snd b) * (fst c), (snd b) * (snd c)]
-                                         valsDE = [(fst d) * (fst e), (fst d) * (snd e), (snd d) * (fst e), (snd d) * (snd e)]
-
-
-
 {-
   A primitive (2^m)th root of unity in the cyclotomic field Q(Zeta_{2^m}).
 -}
 cycloGamma 0 = CycloRat 1
 cycloGamma 1 = CycloRat (-1)
 cycloGamma m = CycloVal (cycloZero (m - 1)) (cycloGamma (m - 1)) (cycloOne  (m - 1))
-
-
 
 {-
   The number 0 in the cyclotomic field Q(Zeta_{2^m}).
@@ -226,8 +212,6 @@ cycloZero  0 = CycloRat 0
 cycloZero  1 = CycloRat 0
 cycloZero  m = CycloVal (cycloZero (m - 1)) (cycloGamma (m - 1)) (cycloZero (m - 1))
 
-
-
 {-
   The number 1 in the cyclotomic field Q(Zeta_{2^m}).
 -}
@@ -235,29 +219,67 @@ cycloOne   0 = CycloRat 1
 cycloOne   1 = CycloRat 1
 cycloOne   m = CycloVal (cycloOne  (m - 1)) (cycloGamma (m - 1)) (cycloZero (m - 1))
 
-
-
 {-
   The (2^m)th roots of unity.
 -}
 rootsOfUnity m = take (2^m) $ iterate (* (cycloGamma m)) (cycloGamma m)
 
 
-
+{-
+  intLogBase return the smallest L such that r < b^(L+1)
+-}
+intLogBase :: Integer -> Integer -> Integer
+intLogBase b r = fst $ head $ filter ((> r) . snd) pows'
+                 where pows' = genpow b 0 1 {- [(0,b), (1,b^2), ... (n,b^(n+1))...] -}
+                       genpow b i acc = (i,nacc):genpow b (i+1) nacc
+                                        where nacc = b * acc
 {-
   kth iteration of converging upper and lower bounds on the square root of a
   rational number.
 -}
-boundSqrt :: Integer -> Rational -> (Rational, Rational)
+bound0SqrtI :: Integer -> Bound Rational
+bound0SqrtI 0 = Bound 0 0
+bound0SqrtI 1 = Bound 1 1
+bound0SqrtI x = Bound low up
+                where logx = intLogBase 2 x
+                      low = 2 ^ (logx `div` 2)
+                      up = if even logx
+                           then 2*low
+                           else 2 ^ ((logx + 1) `div` 2) 
+bound0Sqrt :: Rational -> Bound Rational
+bound0Sqrt r = xb / yb
+                 where xb = bound0SqrtI $ numerator r
+                       yb = bound0SqrtI $ denominator r
+{- refines a bound on the square-root of a rational -}
+boundSqrt' :: Bound Rational -> Rational -> [Bound Rational]
+boundSqrt' b@(Bound low up) r = b:boundSqrt' next r
+                          where up' = (up + r/up)/2 {- always greater than sqrt if up is -}
+                                mid = (low + up')/2
+                                next = if mid^2 < r
+                                       then Bound mid up'
+                                       else Bound low mid
+boundSqrtS :: Rational -> [Bound Rational]
+boundSqrtS r = boundSqrt' b0 r
+               where b0 = bound0Sqrt r
+
+boundSqrt :: Integer -> Rational -> Bound Rational
+{-
+boundSqrt k r = genericIndex (boundSqrtS r) k
 boundSqrt 0 x = (head s, head g)
                 where s = Prelude.filter ((< x) . (^2)) [x, (x-1)..]
                       g = Prelude.filter ((> x) . (^2)) [1..]
-boundSqrt k 0 = (0, 0)
-boundSqrt k x = if   (c^2) < x
-                then (c, u)
-                else (l, c)
-                where p = boundSqrt (k - 1) x
-                      l = fst p
-                      u = snd p
-                      c = (l + u) / 2
+-}
+boundSqrt 0 x = bound0Sqrt x
+boundSqrt k 0 = Bound 0 0
+boundSqrt k x = case (compare  (c^2) x) of 
+                  EQ -> Bound c c {- we hit it exactly -}
+                  LT -> Bound c u'{- c^2 < x, so c is a lower bound -}
+                  GT -> Bound l c {- c^2 > x, so c is upper bound -}
+                where Bound l u = boundSqrt (k - 1) x
+                      u' = (u + x/u)/2 {- always improve upper bound -}
+                      c = (l + u') / 2 {- maybe improve the lower bound -}
 
+boundSqrtB :: Integer -> Bound Rational -> Bound Rational
+boundSqrtB k (Bound l h) = Bound (lower (boundSqrt k l)) (upper (boundSqrt k h)) {- sqrt is monotonic -}
+
+boundSqrtS' x = [boundSqrt k x | k <- [0..]]
