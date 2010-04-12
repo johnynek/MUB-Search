@@ -25,8 +25,12 @@ instance (Ord a, Num a) => Num (Bound a) where
   fromInteger x = Bound bx bx
                   where bx = fromInteger x
   abs b@(Bound l h) = if l < 0
-                      then Bound 0 (max (abs l) (abs h))
-                      else b {- u >= l, so, in this case, both are positive -}
+                      then if h >= 0
+                           {- contain zero -}
+                           then Bound 0 (max (abs l) (abs h))
+                           {- reflect -}
+                           else Bound (abs h) (abs l) 
+                      else b {- u >= l, so, in this case, both are non-negative -}
   {- Here's how to add bounds -} 
   {- Bound with everything -}
   (Bound x y) + (Bound z w) = Bound (x+z) (y+w)
