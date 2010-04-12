@@ -8,7 +8,7 @@
   m is any natural number) are supported.
 -}
 
-module Cyclotomic (Cyclotome, approx, boundMag2, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
+module Cyclotomic (Cyclotome, approx, boundMag2, boundReal, boundImag, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
 
 import Bound
 import Ratio
