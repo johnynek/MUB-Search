@@ -69,7 +69,8 @@ rsum (h : t) = foldl (+) h t
 -}
 lunions :: (Eq a) => [[a]] -> [a]
 lunions []       = []
-{- lunions (h : t)  = Data.List.union (nub h) (lunions t)
+{- 
+lunions (h : t)  = Data.List.union (nub h) (lunions t)
 -}
 lunions x = nub (concat x)
 
@@ -92,26 +93,26 @@ lunions x = nub (concat x)
   defines these bounds (an infinite list of tuples).
 
   We decide ||x||^2 <= e using the first of these vetted bounds.
--}
 pOrth :: Integer -> Rational -> [Cyclotome] -> Bool
 pOrth p e x = (upper $ head t) <= e
               where s = (cycloOne p) + (rsum x)
                     a = [boundMag2 k s | k <- [1 ..]]
                     {- t is a list of bounds that clearly distinguish |x|^2 and e -}
                     t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
-
+-}
+pOrth = pBias 0
 
 {-
   Predicate that determines if a vector is unbiased to the unity vector.
 
   This function works identically to pOrth, except that we are deciding
-  | ||x||^2 - 6 | < e.
+  | ||x||^2 - d | < e.
 -}
-pBias :: Integer -> Rational -> [Cyclotome] -> Bool
-pBias p e x = (upper $ head t) <= e
+pBias :: Rational -> Integer -> Rational -> [Cyclotome] -> Bool
+pBias d p e x = (upper $ head t) <= e
               where s = (cycloOne p) + (rsum x)
-                    a = [abs(boundPlus (boundMag2 k s) (-6)) | k <- [1 ..]]
-                    {- t is a list of bounds that clearly distinguish ||x|^2-6| and e -}
+                    a = [abs(boundPlus (boundMag2 k s) (-d)) | k <- [1 ..]]
+                    {- t is a list of bounds that clearly distinguish ||x|^2-d| and e -}
                     t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
 
 
@@ -122,16 +123,21 @@ main = do
   {-
     Command line arguments.
   -}
-  sD : sP : sE : sM : sS : sJ : _ <- getArgs
+  sD : sP : sM : sS : sJ : _ <- getArgs
   let d = read sD :: Integer
   let p = read sP :: Integer
-  let e = read sE :: Rational
   let m = read sM :: Integer
   let s = read sS :: Integer
   let j = read sJ :: Integer
   let n = 2^p
 
-
+  {-
+    We know the error on inner product is at most:
+    4d\sin^2 (2\pi / 2^(p+1)) = 4*d * Im( e^{2\pi i/2^{p+1}})^2
+   -}
+  {- going to the 4th iteration seems enough accurate enough -}
+  let err_it = 4
+  let err = (fromInteger (4*d)) * (upper (boundImag err_it (cycloGamma (p+1))))^2
   {-
     The 2^pth roots of unity.
   -}
@@ -155,8 +161,8 @@ main = do
     All vectors of roots of unity that are orthogonal / unbiased to the unity vector, for
     the selected job.
   -}
-  let rootsOrth = genericIndex (sublistPredP (pOrth p e) (d - 1) roots s) j
-  let rootsBias = genericIndex (sublistPredP (pBias p e) (d - 1) roots s) j
+  let rootsOrth = genericIndex (sublistPredP (pOrth p err) (d - 1) roots s) j
+  let rootsBias = genericIndex (sublistPredP (pBias (fromInteger d) p err) (d - 1) roots s) j
 
 
   {-
