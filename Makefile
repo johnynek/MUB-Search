@@ -12,7 +12,7 @@
 CC = ghc
 FLAGS = -XFlexibleInstances -XFlexibleContexts -static -optl-static -optl-pthread -fforce-recomp -O -O2 -optc-O2 -optc-O3 -fexcess-precision
 PROF = -prof -auto-all
-
+PACKAGES = -package containers
 
 # Operations.
 #
@@ -41,22 +41,22 @@ push:
 Bound.o: Bound.hs
 	$(CC) -c Bound.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-Cyclotomic: Cyclotomic.hs Bound.o
+Cyclotomic.o: Cyclotomic.hs Bound.o
 	$(CC) -c Cyclotomic.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-Perms: Perms.hs
+Perms.o: Perms.hs
 	$(CC) -c Perms.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-Combinadics: Combinadics.hs
+Combinadics.o: Combinadics.hs
 	$(CC) -c Combinadics.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-SublistPred: SublistPred.hs Combinadics
+SublistPred.o: SublistPred.hs Combinadics.o
 	$(CC) -c SublistPred.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-Polynomial: Polynomial.hs
+Polynomial.o: Polynomial.hs
 	$(CC) -c Polynomial.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-Cliques: Cliques.hs
+Cliques.o: Cliques.hs
 	$(CC) -c Cliques.hs $(FLAGS) $(PACKAGES) $(PROF)
 
 
@@ -65,24 +65,24 @@ Cliques: Cliques.hs
 MUBs2LaTeX: MUBs2LaTeX.hs
 	$(CC) -o MUBs2LaTeX MUBs2LaTeX.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-CheckFourierFamily: CheckFourierFamily.hs Perms
+CheckFourierFamily: CheckFourierFamily.hs Perms.o
 	$(CC) -o CheckFourierFamily CheckFourierFamily.hs Perms.o $(FLAGS) $(PACKAGES) $(PROF)
 
-EquivBases: EquivBases.hs Perms
+EquivBases: EquivBases.hs Perms.o
 	$(CC) -o EquivBases EquivBases.hs Perms.o $(FLAGS) $(PACKAGES) $(PROF)
 
 
 # The big boys.
 #
-FundamentalNeighbors: FundamentalNeighbors.hs Cyclotomic SublistPred Combinadics Perms Bound.o
+FundamentalNeighbors: FundamentalNeighbors.hs Cyclotomic.o SublistPred.o Combinadics.o Perms.o Bound.o
 	$(CC) -o FundamentalNeighbors FundamentalNeighbors.hs Cyclotomic.o Bound.o SublistPred.o Combinadics.o Perms.o $(FLAGS) $(PACKAGES) $(PROF)
 
 Simplify: Simplify.hs
 	$(CC) -o Simplify Simplify.hs $(FLAGS) $(PACKAGES) $(PROF)
 
-MUB-Search: MUB-Search.hs Cliques
+MUB-Search: MUB-Search.hs Cliques.o
 	$(CC) -o MUB-Search MUB-Search.hs Cliques.o $(FLAGS) $(PACKAGES) $(PROF)
 
-HNSS: HNSS.hs Polynomial
+HNSS: HNSS.hs Polynomial.o
 	$(CC) -o HNSS HNSS.hs Polynomial.o $(FLAGS) $(PACKAGES) $(PROF)
 
