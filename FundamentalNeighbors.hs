@@ -123,7 +123,12 @@ main = do
   {-
     Command line arguments.
   -}
-  sD : sP : sM : sS : sJ : _ <- getArgs
+  args <- getArgs 
+  let check = if (length args) < 5
+              then error "usage: <d (dim)> <p (2^{th} roots)> <m (0=orth, 1=unbias)> <s (size)> <j (job)>"
+              else return ()
+  check
+  let sD : sP : sM : sS : sJ : _ = args
   let d = read sD :: Integer
   let p = read sP :: Integer
   let m = read sM :: Integer
@@ -181,7 +186,7 @@ main = do
   let o | s == (-1) = [putStrLn ("1 <= s <= " ++ (show $ maxSize))]
         | (s < 1) || (s > maxSize) = [putStrLn ("Out of range.  1 <= s <= " ++ (show $ maxSize))]
         | j == (-1) = [putStrLn ("0 <= j <= " ++ (show $ maxJobs))]
-        | (j < 1) || (j > maxJobs) = [putStrLn ("Out of range.  1 <= j <= " ++ (show $ maxJobs))]
+        | (j < 0) || (j > maxJobs) = [putStrLn ("Out of range.  0 <= j <= " ++ (show $ maxJobs))]
         | otherwise = map (putStrLn . show) allVecs
   sequence_ o
 
