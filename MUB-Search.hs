@@ -20,16 +20,19 @@ specAdjs l (b, s) = map (genericIndex l) [i .. t]
                               then (length l) - 1
                               else i + s - 1
 
-specVerts :: [a] -> [a] -> (Int, Int) -> [[a]]
+specVerts :: [a] -> [a] -> (Integer, Integer) -> [[a]]
 specVerts z l (b, s) = map (\x -> (genericIndex l x) : z) [i .. t]
                        where i = b * s
-                             t = if i + (s * 2) >= (length l)
-                                 then (length l) - 1
+                             len = genericLength l
+                             {- If the next block would go past the end
+                                of the list, this is the last -}
+                             t = if i + (s * 2) >= len
+                                 then len - 1
                                  else i + s - 1
 
 
 {-
-  MUB-Search <d> <n> <fAdj> <fVert> <r> <k> <vS> <j>
+  MUB-Search <d> <n> <fAdj> <fVert> <r> <k> <totaljobs> <j>
 
   Dimension d vector space.
   Field of scalars has size n.
@@ -50,13 +53,13 @@ main = do
   {-
     Command line arguments.
   -}
-  d' : n' : fAdj : fVert : r' : k' : vS' : j' : _ <- getArgs
+  d' : n' : fAdj : fVert : r' : k' : totJobs' : job' : _ <- getArgs
   let d  = read d'  :: Integer
   let n  = read n'  :: Integer
   let r  = read r'  :: Integer
   let k  = read k'  :: Integer
-  let vS = read vS' :: Integer
-  let j  = read j'  :: Integer
+  let totJobs = read totJobs' :: Integer
+  let job  = read job'  :: Integer
 
 
   {-
@@ -75,35 +78,34 @@ main = do
   -}
   let nC = genericLength ns'
   let vC = genericLength vs'
-  let vBC | vS == -1  = 1
-          | otherwise = (div vC vS)
-
-  let vB | vS == -1  = (0, fromInteger vC)                       :: (Int, Int)
-         | otherwise = (fromInteger (mod j vBC), fromInteger vS) :: (Int, Int)
-  let jobs = (div (fromInteger vC) (snd vB))
-
-
+  let vS = vC `div` totJobs
+  let vB | job >= totJobs = error "job number not less than totJobs" 
+         | otherwise = (job, vS)
   {-
     r = 2.
   -}
-  let q2 = cliques n k ns (specVerts [genericReplicate (d - 1) 0] vs vB)
+  let q2 = concatMap k_sup_cliques (specVerts [genericReplicate (d - 1) 0] vs vB)
            where ns = map read ns' :: [[Integer]]
                  vs = map read vs' :: [[Integer]]
+                 k_sup_cliques = cliques n k ns
 
 
   {-
     r = 3.
-  -}
-  let q3 = cliques n (k - 1) ns (specVerts [] vs vB)
+    Below is broken, hacked to compile
+  let q3 = concatMap sup_clique (specVerts [] vs vB)
            where ns = transpose $ map ((genericTake d) . repeat . read) ns' :: [[[Integer]]]
                  vs = map read vs' :: [[[Integer]]]
+                 sup_clique = cliques n (k-1) ns 
+  -}
+  let q3 = [[[]]] :: [[[Integer]]]
 
 
   {-
     Output.
   -}
-  let s | k == 0 = error ((show nC) ++ " total adjacencies, " ++ (show vC) ++ " total vertices, " ++ (show jobs) ++
-                          " total jobs.   This is job " ++ (show j) ++ " which searches vertex block " ++ (show $ fst vB) ++
+  let s | k == 0 = error ((show nC) ++ " total adjacencies, " ++ (show vC) ++ " total vertices, " ++ (show totJobs) ++
+                          " total jobs.   This is job " ++ (show job) ++ " which searches vertex block " ++ (show $ fst vB) ++
                           " (min size " ++ (show $ snd vB) ++ ").")
         | k == 1 = error ((show k) ++ "-cliques are boring")
         | r == 2 = map (putStrLn . show) q2
