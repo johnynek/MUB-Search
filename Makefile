@@ -83,6 +83,9 @@ Simplify: Simplify.hs
 MUB-Search: MUB-Search.hs Cliques.o
 	$(CC) -o MUB-Search MUB-Search.hs Cliques.o $(FLAGS) $(PACKAGES) $(PROF)
 
+MUB-Search2: MUB-Search2.hs Cliques.o
+	$(CC) -o MUB-Search2 MUB-Search2.hs Cliques.o $(FLAGS) $(PACKAGES) $(PROF)
+
 HNSS: HNSS.hs Polynomial.o
 	$(CC) -o HNSS HNSS.hs Polynomial.o $(FLAGS) $(PACKAGES) $(PROF)
 

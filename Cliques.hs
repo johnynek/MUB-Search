@@ -9,7 +9,7 @@
   -XFlexibleConstructs flags.
 -}
 
-module Cliques (cliques) where
+module Cliques (cliques, setToArray, isnbr_a) where
 
 import Data.List
 import Array
@@ -170,6 +170,12 @@ cliqueExt :: (a -> a -> Bool) -> ([a], [a]) -> [([a],[a])]
 cliqueExt _ ([], clique) = [] {- unextendable -}
 cliqueExt adj (h:t, clique) = (h_adj, h:clique) : (cliqueExt adj (t, clique))
                              where h_adj = filter (adj h) t
+{-
+isClique :: (a -> a -> Bool) -> [a] -> Bool
+isClique _ [] =  True
+isClique _ [h] = True
+isClique adj h:t = (and (map (adj h) t)) && (isClique adj t)
+-}
 
 {-
   Neighbors to a vertex.
