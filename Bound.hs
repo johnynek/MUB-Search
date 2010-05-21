@@ -4,14 +4,22 @@
   by hand
 -}
 
-module Bound (Bound(..), boundPlus, boundTimes, boundContains) where
+module Bound (Bound(..), boundPlus, boundTimes, boundContains, boundLT, boundGT) where
 
 data (Ord a) => Bound a = Bound { lower :: a, upper :: a } | Unbounded
              deriving (Show, Eq)
 
 boundContains :: (Ord a) => Bound a -> a -> Bool
-boundContains Unbounded _ = True
 boundContains (Bound x y) z = (x <= z) && (z <= y)
+boundContains Unbounded _ = True
+
+boundLT :: (Ord a) => Bound a -> Bound a -> Bool
+boundLT (Bound x y) (Bound z w) = y < z
+boundLT Unbounded _ = False
+boundLT _ Unbounded = False
+
+boundGT :: (Ord a) => Bound a -> Bound a -> Bool
+boundGT x y = boundLT y x
 
 boundPlus (Bound x y) z = Bound (x+z) (y+z)
 boundPlus Unbounded _ = Unbounded
