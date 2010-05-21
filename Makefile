@@ -22,7 +22,7 @@ utilities: MUBs2LaTeX CheckFourierFamily EquivBases
 clean_utilities:
 	rm -f MUBs2LaTeX CheckFourierFamily EquivBases
 
-major: FundamentalNeighbors Simplify MUB-Search HNSS
+major: FundamentalNeighbors Simplify MUB-Search HNSS MUB-Search2
 clean_major:
 	rm -f FundamentalNeighbors Simplify MUB-Search HNSS
 
