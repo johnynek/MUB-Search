@@ -92,28 +92,25 @@ lunions x = nub (concat x)
   greater than e and those whose upper bound is less than or equal to e.  t
   defines these bounds (an infinite list of tuples).
 
-  We decide ||x||^2 <= e using the first of these vetted bounds.
-pOrth :: Integer -> Rational -> [Cyclotome] -> Bool
-pOrth p e x = (upper $ head t) <= e
-              where s = (cycloOne p) + (rsum x)
-                    a = [boundMag2 k s | k <- [1 ..]]
-                    {- t is a list of bounds that clearly distinguish |x|^2 and e -}
-                    t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
+  We decide ||x|| <= e using the first of these vetted bounds.
 -}
-pOrth = pBias 0
-
+pOrth :: Rational -> [Cyclotome] -> Bool
+pOrth e x = (upper $ head t) <= e2 
+              where a = [boundMag2 k (rsum x) | k <- [1 ..]]
+                    {- t is a list of bounds that clearly distinguish |x|^2 and e^2 -}
+                    t = filter (\ b -> (not (boundContains b e2)) || ((upper b) == e2)) a
+                    e2 = e*e
 {-
   Predicate that determines if a vector is unbiased to the unity vector.
 
-  This function works identically to pOrth, except that we are deciding
-  | ||x||^2 - d | < e.
+  | ||x|| - b | <= e.
 -}
-pBias :: Rational -> Integer -> Rational -> [Cyclotome] -> Bool
-pBias d p e x = (upper $ head t) <= e
-              where s = (cycloOne p) + (rsum x)
-                    a = [abs(boundPlus (boundMag2 k s) (-d)) | k <- [1 ..]]
+pBias :: [Bound Rational] -> Rational -> [Cyclotome] -> Bool
+pBias b e x = (upper $ head t) <= e
+              where s = rsum x
+                    a = [abs((boundMag k s) - bk) | (k,bk) <- (zip [1 ..] b)]
                     {- t is a list of bounds that clearly distinguish ||x|^2-d| and e -}
-                    t = filter (\ b -> (not (boundContains b e)) || ((upper b) == e)) a
+                    t = filter (\ bnd -> (not (boundContains bnd e)) || ((upper bnd) == e)) a
 
 
 {-
@@ -138,11 +135,15 @@ main = do
 
   {-
     We know the error on inner product is at most:
-    4d\sin^2 (2\pi / 2^(p+1)) = 4*d * Im( e^{2\pi i/2^{p+1}})^2
+    2d\sin (2\pi / 2^(p+1)) = 2*d * Im( e^{2\pi i/2^{p+1}})
+    If we are less than or equal to the lower bound, then we are less
+    than or equal to the actual value
    -}
-  {- going to the 4th iteration seems enough accurate enough -}
-  let err_it = 4
-  let err = (fromInteger (4*d)) * (upper (boundImag err_it (cycloGamma (p+1))))^2
+  {- going to the 5th iteration seems enough accurate enough -}
+  let err_it = 5
+  let err = (fromInteger (2*d)) * (lower (boundImag err_it (cycloGamma (p+1))))
+  -- Pop the first several off so we the bound is more refined by the time we use it
+  let sqrt_d = tails (boundSqrtS (fromInteger d)) !! (fromInteger err_it)
   {-
     The 2^pth roots of unity.
   -}
@@ -166,9 +167,11 @@ main = do
     All vectors of roots of unity that are orthogonal / unbiased to the unity vector, for
     the selected job.
   -}
-  let rootsOrth = genericIndex (sublistPredP (pOrth p err) (d - 1) roots s) j
-  let rootsBias = genericIndex (sublistPredP (pBias (fromInteger d) p err) (d - 1) roots s) j
+  let isOrth v = pOrth err ((cycloOne p):v) 
+  let isUnbiased v = pBias sqrt_d err ((cycloOne p):v) 
 
+  let rootsOrth = genericIndex (sublistPredP isOrth (d - 1) roots s) j
+  let rootsBias = genericIndex (sublistPredP isUnbiased (d - 1) roots s) j
 
   {-
     Select the desired list of vectors and form all permutations.

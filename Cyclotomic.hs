@@ -8,7 +8,7 @@
   m is any natural number) are supported.
 -}
 
-module Cyclotomic (Cyclotome, approx, boundMag2, boundReal, boundImag, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
+module Cyclotomic (Cyclotome, approx, boundMag2, boundMag, boundReal, boundImag, boundSqrtS, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
 
 import Bound
 import Ratio
@@ -150,7 +150,9 @@ approx (CycloVal x gamma y) = (approx x) + (sqrt $ approx gamma) * (approx y)
 boundMag2 k c = r*r + i*i
                 where r = boundReal k c
                       i = boundImag k c
-
+boundMag k c = boundSqrtB k (r*r + i*i)
+               where r = boundReal k c
+                     i = boundImag k c
 {-
   kth iteration of converging lower and upper rational bounds on the real part
   of the square root of gamma in a cyclotome.
