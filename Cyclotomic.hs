@@ -8,7 +8,7 @@
   m is any natural number) are supported.
 -}
 
-module Cyclotomic (Cyclotome, approx, boundMag2, boundMag, boundReal, boundImag, boundSqrtS, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
+module Cyclotomic (Cyclotome, approx, mag2, mag, real, imag, sqrtCR, boundSqrtS, cycloGamma, cycloZero, cycloOne, rootsOfUnity) where
 
 import Bound
 import Ratio
@@ -147,12 +147,12 @@ approx (CycloVal x gamma y) = (approx x) + (sqrt $ approx gamma) * (approx y)
   kth iteration of converging upper and lower rational bounds on the magnitude
   squared of a cyclotome.
 -}
-boundMag2 k c = r*r + i*i
-                where r = boundReal k c
-                      i = boundImag k c
-boundMag k c = boundSqrtB k (r*r + i*i)
-               where r = boundReal k c
-                     i = boundImag k c
+mag2 :: Cyclotome -> ConvergingReal
+mag2 c = r*r + i*i
+                where r = real c
+                      i = imag c
+mag :: Cyclotome -> ConvergingReal
+mag c = sqrtCR (mag2 c)
 {-
   kth iteration of converging lower and upper rational bounds on the real part
   of the square root of gamma in a cyclotome.
@@ -160,42 +160,49 @@ boundMag k c = boundSqrtB k (r*r + i*i)
   Im(\sqrt{a+ib}) = b/\sqrt{2(r+a)}
   if |r| = 1, we have the below:
 -}
-boundRealSqrt k (CycloRat (-1)) = Bound 0 0 {- case of \Im( \sqrt{ -1 } ) -}
-boundRealSqrt k gamma = boundSqrtB k ( boundTimes (boundPlus a 1) (1%2) ) 
-                                        where a = boundReal k gamma
+realSqrt :: Cyclotome -> ConvergingReal
+realSqrt (CycloRat (-1)) = fromInteger 0 {- case of \Im( \sqrt{ -1 } ) -}
+realSqrt gamma = sqrtCR ((one + a)/two)
+                 where a = real gamma
+                       one = fromInteger 1
+                       two = fromInteger 2
 {-
   kth iteration of converging lower and upper rational bounds on the imaginary
   part of the square root of gamma in a cyclotome.
   Im(\sqrt{a+ib}) = b/\sqrt{2(r+a)}
 -}
-boundImagSqrt k (CycloRat (-1)) = Bound 1 1 {- case of \Im( \sqrt{ -1 } ) -}
-boundImagSqrt k gamma = b / (boundSqrtB k (boundTimes (boundPlus a 1) 2)) 
-                                        where b = boundImag k gamma
-                                              a = boundReal k gamma
+imagSqrt :: Cyclotome -> ConvergingReal
+imagSqrt (CycloRat (-1)) = fromInteger 1 {- case of \Im( \sqrt{ -1 } ) -}
+imagSqrt gamma = b / (sqrtCR (two*(one + a)))
+                   where b = imag gamma
+                         a = real gamma
+                         one = fromInteger 1
+                         two = fromInteger 2
 {-
   kth iteration of converging lower and upper bounds on the real part of
   a cyclotome.
   Re(a*b) = Re(a)Re(b) - Im(a)Im(b)
 -}
-boundReal k (CycloRat x) = Bound x x {- Simple case of a real rational number -}
-boundReal k (CycloVal x gamma y) = a + b*c - d*e
-                                   where a  = boundReal k x
-                                         b  = boundReal k y
-                                         c  = boundRealSqrt k gamma 
-                                         d  = boundImag k y
-                                         e  = boundImagSqrt k gamma
+real :: Cyclotome -> ConvergingReal
+real (CycloRat x) = fromRational x {- Simple case of a real rational number -}
+real (CycloVal x gamma y) = a + b*c - d*e
+                                   where a  = real x
+                                         b  = real y
+                                         c  = realSqrt gamma 
+                                         d  = imag y
+                                         e  = imagSqrt gamma
 {-
   kth iteration of converging lower and upper bounds on the imaginary part of
   a cyclotome.
   Im(a*b) = Re(a)Im(b) + Im(a)Re(b)
 -}
-boundImag k (CycloRat x) = Bound 0 0 {- Simple case of a real rational-> no imag. -}
-boundImag k (CycloVal x gamma y) = a + b*c + d*e 
-                                   where a  = boundImag k x
-                                         b  = boundImag k y
-                                         c  = boundRealSqrt k gamma
-                                         d  = boundReal k y
-                                         e  = boundImagSqrt k gamma
+imag (CycloRat x) = fromInteger 0 {- Simple case of a real rational-> no imag. -}
+imag (CycloVal x gamma y) = a + b*c + d*e 
+                                   where a  = imag x
+                                         b  = imag y
+                                         c  = realSqrt gamma
+                                         d  = real y
+                                         e  = imagSqrt gamma
 {-
   A primitive (2^m)th root of unity in the cyclotomic field Q(Zeta_{2^m}).
 -}
@@ -219,8 +226,10 @@ cycloOne   m = CycloVal (cycloOne  (m - 1)) (cycloGamma (m - 1)) (cycloZero (m -
 
 {-
   The (2^m)th roots of unity.
+  where w = e^{2\pi i/2^m}
+  [ w^0, w^1, w^2, ... w^(2^m - 1) ]
 -}
-rootsOfUnity m = take (2^m) $ iterate (* (cycloGamma m)) (cycloGamma m)
+rootsOfUnity m = take (2^m) $ iterate (* (cycloGamma m)) (cycloOne m)
 
 
 {-
@@ -287,3 +296,6 @@ boundSqrtB :: Integer -> Bound Rational -> Bound Rational
 boundSqrtB k (Bound l h) = Bound (lower (boundSqrt k l)) (upper (boundSqrt k h)) {- sqrt is monotonic -}
 
 boundSqrtS' x = [boundSqrt k x | k <- [0..]]
+
+-- This is an O(N^2) operation, not so great, avoid it...
+sqrtCR cr = ConvergingReal [boundSqrtB k b | (b,k) <- zip (toList cr) [0..]] 

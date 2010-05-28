@@ -94,24 +94,16 @@ lunions x = nub (concat x)
 
   We decide ||x|| <= e using the first of these vetted bounds.
 -}
-pOrth :: Rational -> [Cyclotome] -> Bool
-pOrth e x = (upper $ head t) <= e2 
-              where a = [boundMag2 k (rsum x) | k <- [1 ..]]
-                    {- t is a list of bounds that clearly distinguish |x|^2 and e^2 -}
-                    t = filter (\ b -> (not (boundContains b e2)) || ((upper b) == e2)) a
-                    e2 = e*e
+pOrth :: ConvergingReal -> [Cyclotome] -> Bool
+pOrth e x = (mag2 (rsum x)) <= (e * e) -- mag2 is much faster than mag, so use it.
 {-
   Predicate that determines if a vector is unbiased to the unity vector.
 
   | ||x|| - b | <= e.
 -}
-pBias :: [Bound Rational] -> Rational -> [Cyclotome] -> Bool
-pBias b e x = (upper $ head t) <= e
-              where s = rsum x
-                    a = [abs((boundMag k s) - bk) | (k,bk) <- (zip [1 ..] b)]
-                    {- t is a list of bounds that clearly distinguish ||x|^2-d| and e -}
-                    t = filter (\ bnd -> (not (boundContains bnd e)) || ((upper bnd) == e)) a
-
+pBias :: ConvergingReal -> ConvergingReal -> [Cyclotome] -> Bool
+pBias b e x = (abs (x1 - b)) <= e
+            where x1 = mag (rsum x)
 
 {-
   Main entry point.
@@ -139,11 +131,9 @@ main = do
     If we are less than or equal to the lower bound, then we are less
     than or equal to the actual value
    -}
-  {- going to the 5th iteration seems enough accurate enough -}
-  let err_it = 5
-  let err = (fromInteger (2*d)) * (lower (boundImag err_it (cycloGamma (p+1))))
+  let err = (fromInteger (2*d)) * (abs (imag (cycloGamma (p+1))))
   -- Pop the first several off so we the bound is more refined by the time we use it
-  let sqrt_d = tails (boundSqrtS (fromInteger d)) !! (fromInteger err_it)
+  let sqrt_d = sqrtCR (fromInteger d)
   {-
     The 2^pth roots of unity.
   -}
@@ -176,10 +166,10 @@ main = do
   {-
     Select the desired list of vectors and form all permutations.
   -}
-  let roots = if   m == 0
+  let roots' = if   m == 0
               then rootsOrth
               else rootsBias
-  let vecs = map lookup roots
+  let vecs = map lookup roots'
   let allVecs = lunions $ map permuteAllL vecs
 
 

@@ -3,8 +3,9 @@
   use the bounds in the normal formulas and not continually calculate them
   by hand
 -}
+module Bound (Bound(..), ConvergingReal(..), boundPlus, boundTimes, boundContains, boundLT, boundGT) where
 
-module Bound (Bound(..), boundPlus, boundTimes, boundContains, boundLT, boundGT) where
+import Ratio
 
 data (Ord a) => Bound a = Bound { lower :: a, upper :: a } | Unbounded
              deriving (Show, Eq)
@@ -21,12 +22,17 @@ boundLT _ Unbounded = False
 boundGT :: (Ord a) => Bound a -> Bound a -> Bool
 boundGT x y = boundLT y x
 
+boundOverlap x y = not ((boundLT x y) || (boundGT x y))
+
 boundPlus (Bound x y) z = Bound (x+z) (y+z)
 boundPlus Unbounded _ = Unbounded
 
 boundTimes (Bound x y) z | z >= (fromInteger 0) = Bound (x*z) (y*z)
                          | otherwise = Bound (y*z) (x*z)
 boundTimes Unbounded _ = Unbounded
+
+boundApprox :: (Ord a, Fractional a) => Bound a -> a
+boundApprox b = ((lower b) + (upper b)) * fromRational(1%2)
 
 instance (Ord a, Num a) => Num (Bound a) where
   signum _ = undefined
@@ -75,3 +81,59 @@ instance (Ord a, Fractional a) => Fractional (Bound a) where
   recip b@(Bound x y) = if boundContains b (fromInteger 0)
                         then Unbounded {- we can't deal with disjoint bounds -}
                         else Bound (recip y) (recip x)
+
+-- a sequence of converging bounds
+data ConvergingReal = ConvergingReal { toList :: [Bound Rational] }
+
+instance Show ConvergingReal where
+  show cr0 = show dec
+           where dec = fromRational (boundApprox ((toList cr0) !! 3)) :: Double
+
+instance Eq ConvergingReal where
+  -- To be equal, they all overlap, this will take infinitely long
+  cr0 == cr1 = if (b0 == b1) && (fromRational (lower b0) == b0) -- This is a rational number
+               then True
+               else (boundOverlap b0 b1) && ((ConvergingReal t0) == (ConvergingReal t1)) 
+             where b0:t0 = toList cr0
+                   b1:t1 = toList cr1
+
+instance Ord ConvergingReal where
+  -- <, <=, >, >=, max, min
+  cr0 < cr1 = if not (bLT || bGT) 
+              then (ConvergingReal t0) < (ConvergingReal t1)
+              else bLT 
+            where b0:t0 = toList cr0
+                  b1:t1 = toList cr1
+                  bLT = boundLT b0 b1
+                  bGT = boundGT b0 b1
+
+  -- make sure we avoid == if possible:
+  cr0 <= cr1 = (cr0 < cr1) || (cr0 == cr1)
+  cr0 > cr1 = (cr1 < cr0)
+  cr0 >= cr1 = (cr1 < cr0) || (cr0 == cr1)
+  max cr0 cr1 = if cr0 > cr1
+                then cr0
+                else cr1
+  min cr0 cr1 = if cr0 < cr1
+                then cr0
+                else cr1
+  
+instance Num ConvergingReal where
+  signum cr = if sl == sh
+              then ConvergingReal (repeat (fromRational sh))
+              else signum (ConvergingReal t)
+             where
+                   (Bound l h):t = toList cr
+                   sl = signum l
+                   sh = signum h
+  fromInteger x = ConvergingReal (repeat (Bound rx rx))
+                  where rx = fromInteger x
+  -- lift the abs and negate functions:
+  abs cr = ConvergingReal (map abs (toList cr))
+  negate cr = ConvergingReal (map negate (toList cr))
+  cr0 + cr1 = ConvergingReal [ b0 + b1 | (b0, b1) <- zip (toList cr0) (toList cr1)]
+  cr0 * cr1 = ConvergingReal [ b0 * b1 | (b0, b1) <- zip (toList cr0) (toList cr1)]
+
+instance Fractional ConvergingReal where
+  fromRational r = ConvergingReal (repeat (Bound r r))
+  recip cr = ConvergingReal (map recip (toList cr))
