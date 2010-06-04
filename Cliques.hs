@@ -9,7 +9,7 @@
   -XFlexibleConstructs flags.
 -}
 
-module Cliques (cliques, setToArray, isnbr_a) where
+module Cliques (toIntBE, cliques, setToArray, isnbr_a) where
 
 import Data.List
 import Array
@@ -197,18 +197,19 @@ nbrs n l v = filter (> v) allnbr
 isnbr :: (Ord a, Scalar (Vector a)) => Integer -> Set.Set (Vector a) -> Vector a -> Vector a -> Bool
 isnbr n l v1 v2 = Set.member (x n v1 v2) l
 
-toIntBE :: Integer -> [Integer] -> Integer
-toIntBE base num = foldl (\acc h -> base*acc + h) 0 num
+toIntBE :: (Num a) => a -> [a] -> a
+toIntBE base num = foldl (\acc h -> base*acc + h) (fromInteger 0) num
 
-setToArray :: Integer -> Set.Set ([Integer]) -> Array Integer Bool
+setToArray :: (Ix a, Num a) => a -> Set.Set ([a]) -> Array a Bool
 setToArray n s = array (min, max) [(i, Set.member i numset) | i <- range (min,max)]
                  where max = Set.findMax numset 
                        min = Set.findMin numset
                        numset = Set.map (toIntBE n) s
 
-isnbr_a :: Integer -> Array Integer Bool -> [Integer] -> [Integer] -> Bool
+isnbr_a :: (Ix a, Integral a) => a -> Array a Bool -> [a] -> [a] -> Bool
 isnbr_a base atab v1 v2 = if (vdiff <= up) && (low <= vdiff)
                      then atab ! vdiff
                      else False
-                   where vdiff = toIntBE base (x base v1 v2)
+                   where vdiff = toIntBE base (subvs v1 v2)
                          (low, up) = bounds atab
+                         subvs v1 v2 = [ (yi-xi) `mod` base | (xi,yi) <- zip v1 v2 ]
