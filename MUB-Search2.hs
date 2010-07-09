@@ -45,13 +45,15 @@ lengthAtLeast :: Int -> [a] -> Bool
 lengthAtLeast x l = (length (take x l)) == x
 
 type IntListAdj = [Int] -> [Int] -> Bool
+type Basis = [[Int]]
 {-
 first is the list of vectors potentially unbiased to the the candidate vectors
 second is the list of vectors potentially orthogonal to the candidate vectors
 third is the list of candidate vectors
 -}
-type Candidate  = ([[Int]], [[Int]], [[Int]])
-
+type Candidate  = ([[Int]], [[Int]], Basis)
+getBasis :: Candidate -> Basis
+getBasis (_,_,basis) = basis
 {-
 Take the unbiased IntListAdj
          orth IntListAdj
@@ -69,11 +71,69 @@ basisExt uAdj oAdj ul (ubs, h:t, clique) = if ext
                                         ext = lengthAtLeast ul h_ub -- there are sufficient unbiased vects
 
 makeCand :: IntListAdj -> IntListAdj -> [[Int]] -> [[Int]] -> [[Int]] -> Candidate
-makeCand _ _ _ _ v | not (any (all (==0)) v) = error "Must contain zero vector"
+-- makeCand _ _ _ _ v | not (any (all (==0)) v) = error "Must contain zero vector"
 makeCand uAdj oAdj ubZ oZ vects = (ubcand, ocand, vects) 
                           where ubcand = filter (trueForAll uAdj vects) ubZ
                                 ocand = filter (trueForAll oAdj vects) oZ
                                 trueForAll adj l v = all (adj v) l
+{-
+ Need a function to take a Candidate and return a list of bases (complete candidates).
+ Need another function that takes a candidate and returns all bases unbiased to the candidate
+ Need a function that takes an initial candidate, an integer and returns a list of lists of unbiased
+   candidates exactly the length of the integer.
+ Run the above for the given number, and print them out.
+-}
+
+-- Extends the candidates to full basis candidates. Initial cliques must have the same size
+makeBasis :: IntListAdj -> IntListAdj -> Int -> Candidate -> [Candidate]
+makeBasis uAdj oAdj ul init_cand = all_cand
+               where (ubc,oc,clique) = init_cand 
+                     current_size = length clique
+                     dim = length (clique !! 0) + 1 --dimension is length + 1 of each clique member:
+                     iterate_depth = dim - current_size
+                     child_cand = basisExt uAdj oAdj ul
+                     cand_ex = concatMap child_cand
+                     all_cand = (iterate cand_ex [init_cand]) !! iterate_depth
+-- Return a list of single items from a list as a set, with the compliment:
+singles :: [a] -> [(a,[a])]
+singles [] = []
+singles ys = singles' [] ys
+      where singles' acc [y] = [(y,acc)]
+            singles' acc (x:xs) = (x, acc ++ xs):(singles' (acc ++ [x]) xs)
+
+-- Take a basis candidate (orthogonality clique is size d)
+makeUB :: IntListAdj -> IntListAdj -> Candidate -> [Candidate]
+makeUB _ _ ([],_,_) = []
+makeUB uAdj oAdj (ucand,ocand,clique) = concatMap next init
+                        where init = [(makeCand uAdj oAdj (snd sings) (snd sings) [(fst sings)]) | sings <- (singles ucand)]
+                              next = makeBasis uAdj oAdj 0
+{-
+  Take a Candidate, extend them into full bases, and then 
+  [a] -> (a -> [a]) -> [[a]]
+
+  iterate2 :: (a -> [a]) -> a -> [a]
+  [([x],[x0,x1,...]),([x0,x],[f(x0)]),
+-}
+make4MUBs :: IntListAdj -> IntListAdj -> Candidate -> [(Basis,Basis,Basis,Basis)]
+make4MUBs uAdj oAdj cand = do
+                     child0 <- makeBasis uAdj oAdj 1 cand;
+                     child1 <- makeUB uAdj oAdj child0;
+                     child2 <- makeUB uAdj oAdj child1;
+                     child3 <- makeUB uAdj oAdj child2;
+                     return ((getBasis child0), (getBasis child1), (getBasis child2), (getBasis child3))
+
+make3MUBs :: IntListAdj -> IntListAdj -> Candidate -> [(Basis,Basis,Basis)]
+make3MUBs uAdj oAdj cand = do
+                     child0 <- makeBasis uAdj oAdj 1 cand;
+                     child1 <- makeUB uAdj oAdj child0;
+                     child2 <- makeUB uAdj oAdj child1;
+                     return ((getBasis child0), (getBasis child1), (getBasis child2))
+
+make2MUBs :: IntListAdj -> IntListAdj -> Candidate -> [(Basis,Basis)]
+make2MUBs uAdj oAdj cand = do
+                     child0 <- makeBasis uAdj oAdj 1 cand;
+                     child1 <- makeUB uAdj oAdj child0;
+                     return ((getBasis child0), (getBasis child1))
 
 {-
   MUB-Search2 <d> <n> <fOrth> <fUnbias> <fVert> <k> <totaljobs> <j>
@@ -130,12 +190,15 @@ main = do
   {- Put the all zero vector in, and build the bases for this job to search. -}
   let init_verts = specVerts [replicate (d - 1) 0] secondVecs vB
   let init_cand = map (makeCand pUnbias pOrth unbiasTab orthTab) init_verts
+  let orth_bases = concatMap (make3MUBs pUnbias pOrth) init_cand
+{-
   --let iterate_depth = d - (genericLength init_verts)
   let iterate_depth = d - 2 -- We have all zero, and one initial vectors
   let all_cand = (iterate cand_ex init_cand) `genericIndex` iterate_depth
                where cand_ex = concatMap child_cand
                      child_cand = basisExt pUnbias pOrth (d*(k-1))
   let orth_bases = [ basis | (_,_,basis) <- all_cand ]
+-}
   {-
     Output.
   -}
@@ -146,4 +209,5 @@ main = do
         | otherwise = map (putStrLn . show) orth_bases 
         -- | otherwise = map (putStrLn . show) all_cand
   sequence_ $ s
+  putStrLn "#Done"
 
