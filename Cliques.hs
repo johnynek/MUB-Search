@@ -198,7 +198,7 @@ isnbr :: (Ord a, Scalar (Vector a)) => Integer -> Set.Set (Vector a) -> Vector a
 isnbr n l v1 v2 = Set.member (x n v1 v2) l
 
 toIntBE :: (Num a) => a -> [a] -> a
-toIntBE base num = foldl (\acc h -> base*acc + h) (fromInteger 0) num
+toIntBE base num = foldl' (\acc h -> base*acc + h) (fromInteger 0) num
 
 setToArray :: (Ix a, Num a) => a -> Set.Set ([a]) -> Array a Bool
 setToArray n s = array (min, max) [(i, Set.member i numset) | i <- range (min,max)]

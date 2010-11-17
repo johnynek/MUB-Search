@@ -7,6 +7,8 @@ import System(getArgs)
 import Data.List
 import qualified Data.Set as Set
 import Cliques
+-- import Debug.Trace
+import Array
 
 
 {-
@@ -29,20 +31,51 @@ specVerts z l (b, s) = map (\x -> (genericIndex l x) : z) [i .. t]
                              t = if i + (s * 2) >= len
                                  then len - 1
                                  else i + s - 1
+-- Fold two lists together:
+foldl2' :: (a -> b -> c -> a) -> a -> [b] -> [c] -> a
+foldl2' _    zero [] _   = zero `seq` zero
+foldl2' _    zero _ []   = zero `seq` zero
+foldl2' step zero (x:xs) (y:ys)  =
+    let new = step zero x y
+    in  new `seq` foldl2' step new xs ys
+-- Convert a root-of-unity dot-product to an integer:
+-- <a, b> -> Int
+ruFold :: Int -> Int -> Int -> Int -> Int
+ruFold base acc h k = base*acc + ((k - h) `mod` base)
+-- ruFold base acc h k = let dif = k - h
+--                          md = dif `seq` (dif `mod` base)
+--                          bp = md `seq` base * acc
+--                          sm = bp `seq` (bp + md)
+--                      in sm
+toRUDot :: Int -> [Int] -> [Int] -> Int
+toRUDot base = foldl2' (ruFold base) 0 
+-- toRUDot base a_vec b_vec = foldl2' (ruFold base) 0 a_vec b_vec
 
 -- This requires base^d entries, but is very fast
-makeAdj :: Int -> [[Int]] -> [Int] -> [Int] -> Bool
-makeAdj base list = isnbr_a base list_a
-                  where list_a = setToArray base (Set.fromList list)
+makeAdjTab :: Int -> [[Int]] -> Array Int Bool
+makeAdjTab base list = setToArray base (Set.fromList list)
+makeAdj :: Int -> Array Int Bool -> [Int] -> [Int] -> Bool
+makeAdj = isnbr_a 
 -- This is space optimal, but O(log N) time to look up.
-makeAdjSet :: Int -> [[Int]] -> [Int] -> [Int] -> Bool
-makeAdjSet base list x y = Set.member diffv s
-                         where diffv = toI [ (yi-xi) `mod` base | (xi,yi) <- zip x y]
-                               s = Set.fromList (map toI list)
-                               toI larg = toIntBE base (sort larg)
+makeAdjSetTab :: Int -> [[Int]] -> Set.Set Int
+makeAdjSetTab base list = Set.fromList (map toI list)
+                        --where toI larg = toIntBE base (sort larg)
+                        where toI = toIntBE base
+
+makeAdjSet :: ([Int] -> [Int] -> Int) -> Set.Set Int -> [Int] -> [Int] -> Bool
+--makeAdjSet base s x y = Set.member diffv s
+makeAdjSet ubf s x y = Set.member (ubf x y) s
+                         -- where diffv = toI [ (yi-xi) `mod` base | (xi,yi) <- zip x y]
+                         --       toI larg = toIntBE base larg
+                         --where diffv = toRUDot base x y
 
 lengthAtLeast :: Int -> [a] -> Bool
-lengthAtLeast x l = (length (take x l)) == x
+-- lengthAtLeast x l = (length (take x l)) == x
+lengthAtLeast x [] | x > 0 = False
+lengthAtLeast 0 _ = True
+lengthAtLeast x (y:ys) = lengthAtLeast (x-1) ys
+-- TODO you might want this:
+-- lengthAtLeast x l = True
 
 type IntListAdj = [Int] -> [Int] -> Bool
 type Basis = [[Int]]
@@ -63,12 +96,12 @@ Take the unbiased IntListAdj
 -}
 basisExt :: IntListAdj -> IntListAdj -> Int -> Candidate -> [Candidate]
 basisExt _ _ _ (_, [], _) = []
-basisExt uAdj oAdj ul (ubs, h:t, clique) = if ext
-                                           then (h_ub, h_orth, h:clique):(basisExt uAdj oAdj ul (ubs, t, clique))
-                                           else basisExt uAdj oAdj ul (ubs, t, clique)
-                                  where h_ub = filter (uAdj h) ubs -- all in ubs unbiased to h
-                                        h_orth = filter (oAdj h) t -- all in t orth to h
-                                        ext = lengthAtLeast ul h_ub -- there are sufficient unbiased vects
+basisExt uAdj oAdj ul (ubs, h:t, clique) = let h_ub = filter (uAdj h) ubs -- all in ubs unbiased to h
+                                               h_orth = filter (oAdj h) t -- all in t orth to h
+                                               ext = lengthAtLeast ul h_ub -- there are sufficient unbiased vects
+                                           in if ext
+                                              then (h_ub, h_orth, h:clique):(basisExt uAdj oAdj ul (ubs, t, clique))
+                                              else basisExt uAdj oAdj ul (ubs, t, clique)
 
 makeCand :: IntListAdj -> IntListAdj -> [[Int]] -> [[Int]] -> [[Int]] -> Candidate
 -- makeCand _ _ _ _ v | not (any (all (==0)) v) = error "Must contain zero vector"
@@ -99,14 +132,20 @@ singles :: [a] -> [(a,[a])]
 singles [] = []
 singles ys = singles' [] ys
       where singles' acc [y] = [(y,acc)]
-            singles' acc (x:xs) = (x, acc ++ xs):(singles' (acc ++ [x]) xs)
+            singles' acc (x:xs) = (x, acc ++ xs):(singles' (x:acc) xs)
+--rest [1,2,3] = [(1,[2,3]), (2,[3]), (3,[])]
+rest :: [a] -> [(a, [a])]
+rest [] = []
+rest (y:ys) = (y, ys):(rest ys)
 
 -- Take a basis candidate (orthogonality clique is size d)
-makeUB :: IntListAdj -> IntListAdj -> Candidate -> [Candidate]
-makeUB _ _ ([],_,_) = []
-makeUB uAdj oAdj (ucand,ocand,clique) = concatMap next init
-                        where init = [(makeCand uAdj oAdj (snd sings) (snd sings) [(fst sings)]) | sings <- (singles ucand)]
-                              next = makeBasis uAdj oAdj 0
+makeUB :: IntListAdj -> IntListAdj -> Int -> Candidate -> [Candidate]
+makeUB _ _ ul (ucand,_,_) | (length ucand) < ul = []
+makeUB uAdj oAdj ul (ucand,ocand,clique) = concatMap next init
+                        --where init = [(makeCand uAdj oAdj (snd sings) (snd sings) [(fst sings)]) | sings <- (singles ucand)]
+                        -- construct the basis in order, so we don't needlessly repeat, using rest:
+                        where init = [(makeCand uAdj oAdj ucand (snd sings) [(fst sings)]) | sings <- (rest ucand)]
+                              next = makeBasis uAdj oAdj ul
 {-
   Take a Candidate, extend them into full bases, and then 
   [a] -> (a -> [a]) -> [[a]]
@@ -114,25 +153,25 @@ makeUB uAdj oAdj (ucand,ocand,clique) = concatMap next init
   iterate2 :: (a -> [a]) -> a -> [a]
   [([x],[x0,x1,...]),([x0,x],[f(x0)]),
 -}
-make4MUBs :: IntListAdj -> IntListAdj -> Candidate -> [(Basis,Basis,Basis,Basis)]
-make4MUBs uAdj oAdj cand = do
-                     child0 <- makeBasis uAdj oAdj 1 cand;
-                     child1 <- makeUB uAdj oAdj child0;
-                     child2 <- makeUB uAdj oAdj child1;
-                     child3 <- makeUB uAdj oAdj child2;
+make4MUBs :: IntListAdj -> IntListAdj -> Int -> Candidate -> [(Basis,Basis,Basis,Basis)]
+make4MUBs uAdj oAdj d cand = do
+                     child0 <- makeBasis uAdj oAdj (3*d) cand;
+                     child1 <- makeUB uAdj oAdj (2*d) child0;
+                     child2 <- makeUB uAdj oAdj d child1;
+                     child3 <- makeUB uAdj oAdj 0 child2;
                      return ((getBasis child0), (getBasis child1), (getBasis child2), (getBasis child3))
 
-make3MUBs :: IntListAdj -> IntListAdj -> Candidate -> [(Basis,Basis,Basis)]
-make3MUBs uAdj oAdj cand = do
-                     child0 <- makeBasis uAdj oAdj 1 cand;
-                     child1 <- makeUB uAdj oAdj child0;
-                     child2 <- makeUB uAdj oAdj child1;
+make3MUBs :: IntListAdj -> IntListAdj -> Int -> Candidate -> [(Basis,Basis,Basis)]
+make3MUBs uAdj oAdj d cand = do
+                     child0 <- makeBasis uAdj oAdj (2*d) cand;
+                     child1 <- makeUB uAdj oAdj d child0;
+                     child2 <- makeUB uAdj oAdj 0 child1;
                      return ((getBasis child0), (getBasis child1), (getBasis child2))
 
-make2MUBs :: IntListAdj -> IntListAdj -> Candidate -> [(Basis,Basis)]
-make2MUBs uAdj oAdj cand = do
-                     child0 <- makeBasis uAdj oAdj 1 cand;
-                     child1 <- makeUB uAdj oAdj child0;
+make2MUBs :: IntListAdj -> IntListAdj -> Int -> Candidate -> [(Basis,Basis)]
+make2MUBs uAdj oAdj d cand = do
+                     child0 <- makeBasis uAdj oAdj d cand;
+                     child1 <- makeUB uAdj oAdj 0 child0;
                      return ((getBasis child0), (getBasis child1))
 
 {-
@@ -183,14 +222,19 @@ main = do
   -}
   let vC = genericLength secondVecs 
   let vB | job >= totJobs = error "job number not less than totJobs" 
+         | vC < totJobs = error ("Can't divide into more jobs than " ++ (show vC))
          | otherwise = (job, vC `div` totJobs)
-
-  let pOrth = makeAdjSet n orthTab 
-  let pUnbias = makeAdjSet n unbiasTab 
+  let orthSTab = makeAdjSetTab n orthTab
+  let unbiasSTab = makeAdjSetTab n unbiasTab
+  let !innerprod = toRUDot n
+  let !pOrth = makeAdjSet innerprod orthSTab 
+  let !pUnbias = makeAdjSet innerprod unbiasSTab 
   {- Put the all zero vector in, and build the bases for this job to search. -}
   let init_verts = specVerts [replicate (d - 1) 0] secondVecs vB
+  -- let init_cand = traceShow init_verts $ map (makeCand pUnbias pOrth unbiasTab orthTab) init_verts
   let init_cand = map (makeCand pUnbias pOrth unbiasTab orthTab) init_verts
-  let orth_bases = concatMap (make3MUBs pUnbias pOrth) init_cand
+  -- let orth_bases = traceShow init_cand $ take 1000000 $ concatMap (make4MUBs pUnbias pOrth d) init_cand
+  let orth_bases = concatMap (make3MUBs pUnbias pOrth d) init_cand
 {-
   --let iterate_depth = d - (genericLength init_verts)
   let iterate_depth = d - 2 -- We have all zero, and one initial vectors
