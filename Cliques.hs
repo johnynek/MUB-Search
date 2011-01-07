@@ -9,7 +9,7 @@
   -XFlexibleConstructs flags.
 -}
 
-module Cliques (toIntBE, cliques, setToArray, isnbr_a) where
+module Cliques (toIntBE, fromIntBE, cliques, setToArray, isnbr_a) where
 
 import Data.List
 import Array
@@ -199,6 +199,12 @@ isnbr n l v1 v2 = Set.member (x n v1 v2) l
 
 toIntBE :: (Num a) => a -> [a] -> a
 toIntBE base num = foldl' (\acc h -> base*acc + h) (fromInteger 0) num
+
+fromIntBE base num = fromIntBE' [] base num
+                     where  fromIntBE' acc b n = let (d,m) = divMod n b
+                                                      in if n == 0
+                                                         then acc 
+                                                         else fromIntBE' (m:acc) base d
 
 setToArray :: (Ix a, Num a) => a -> Set.Set ([a]) -> Array a Bool
 setToArray n s = array (min, max) [(i, Set.member i numset) | i <- range (min,max)]

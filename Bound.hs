@@ -3,7 +3,7 @@
   use the bounds in the normal formulas and not continually calculate them
   by hand
 -}
-module Bound (Bound(..), ConvergingReal(..), boundPlus, boundTimes, boundContains, boundLT, boundGT) where
+module Bound (Bound(..), ConvergingReal(..), boundPlus, boundTimes, boundContains, boundLT, boundGT, union, pow, powCR) where
 
 import Ratio
 
@@ -33,6 +33,10 @@ boundTimes Unbounded _ = Unbounded
 
 boundApprox :: (Ord a, Fractional a) => Bound a -> a
 boundApprox b = ((lower b) + (upper b)) * fromRational(1%2)
+
+union (Bound l0 u0) (Bound l1 u1) = Bound (min l0 l1) (max u0 u1)
+union _ Unbounded = Unbounded
+union Unbounded _ = Unbounded
 
 instance (Ord a, Num a) => Num (Bound a) where
   signum _ = undefined
@@ -73,7 +77,14 @@ instance (Ord a, Num a) => Num (Bound a) where
 -}
   Unbounded * _ = Unbounded 
   _ * Unbounded = Unbounded 
-   
+
+pow :: (Ord a, Num a, Integral b) => Bound a -> b -> Bound a
+pow b@(Bound l u) e | (l >= 0) || (odd e) = Bound ((Prelude.^) l e) ((Prelude.^) u e)
+                    | u >= 0 = Bound 0 ((Prelude.^) (max (abs l) u) e) -- e is even AND l < 0
+                    | otherwise = pow (negate b) e -- e is even, and u < 0
+pow Unbounded _ = Unbounded
+
+ 
 instance (Ord a, Fractional a) => Fractional (Bound a) where
   fromRational r = Bound fr fr
                    where fr = fromRational r
@@ -87,7 +98,8 @@ data ConvergingReal = ConvergingReal { toList :: [Bound Rational] }
 
 instance Show ConvergingReal where
   show cr0 = show dec
-           where dec = fromRational (boundApprox ((toList cr0) !! 3)) :: Double
+           where dec = fromRational (boundApprox app) :: Double
+                 app = head $ dropWhile (\ b -> abs((lower b) - (upper b)) > 1e-14) (toList cr0)
 
 instance Eq ConvergingReal where
   -- To be equal, they all overlap, this will take infinitely long
@@ -133,6 +145,9 @@ instance Num ConvergingReal where
   negate cr = ConvergingReal (map negate (toList cr))
   cr0 + cr1 = ConvergingReal [ b0 + b1 | (b0, b1) <- zip (toList cr0) (toList cr1)]
   cr0 * cr1 = ConvergingReal [ b0 * b1 | (b0, b1) <- zip (toList cr0) (toList cr1)]
+
+powCR :: (Integral a) => ConvergingReal -> a -> ConvergingReal
+powCR cr e = ConvergingReal (map (\ x -> x `pow` e) (toList cr))
 
 instance Fractional ConvergingReal where
   fromRational r = ConvergingReal (repeat (Bound r r))

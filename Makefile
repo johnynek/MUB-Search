@@ -12,7 +12,7 @@
 CC = ghc
 #FLAGS = -XFlexibleInstances -XFlexibleContexts -static -optl-static -optl-pthread -fforce-recomp -O -O2 -optc-O2 -optc-O3 -fexcess-precision
 #FLAGS = -XFlexibleInstances -XFlexibleContexts -optl-pthread -fforce-recomp -O -O2 -optc-O2 -optc-O3 -fexcess-precision -fvia-C
-FLAGS = -XFlexibleInstances -XFlexibleContexts -fforce-recomp -O -O2 -optc-O2 -optc-O3 -fexcess-precision -fvia-C
+FLAGS = -XFlexibleInstances -XFlexibleContexts -static -optl-static -optl-pthread -fforce-recomp -O2 -fexcess-precision 
 #PROF = -prof -auto-all -caf-all
 PROF = 
 PACKAGES = -package containers
@@ -21,13 +21,13 @@ PACKAGES = -package containers
 #
 all: utilities major
 
-utilities: MUBs2LaTeX CheckFourierFamily EquivBases
+utilities: MUBs2LaTeX CheckFourierFamily EquivBases MakeUniqPerms
 clean_utilities:
-	rm -f MUBs2LaTeX CheckFourierFamily EquivBases
+	rm -f MUBs2LaTeX CheckFourierFamily EquivBases MakeUniqPerms
 
-major: FundamentalNeighbors Simplify MUB-Search HNSS MUB-Search2
+major: FundamentalNeighbors Simplify MUB-Search HNSS MUB-Search2 FundamentalNeighborsSimple
 clean_major:
-	rm -f FundamentalNeighbors Simplify MUB-Search HNSS
+	rm -f FundamentalNeighbors Simplify MUB-Search HNSS MUB-Search2
 
 clean: clean_utilities clean_major
 	rm -f *.hi *.o *.prof *.aux *.hp *.ps
@@ -74,11 +74,16 @@ CheckFourierFamily: CheckFourierFamily.hs Perms.o
 EquivBases: EquivBases.hs Perms.o
 	$(CC) -o EquivBases EquivBases.hs Perms.o $(FLAGS) $(PACKAGES) $(PROF)
 
+MakeUniqPerms: MakeUniqPerms.hs
+	$(CC) -o MakeUniqPerms MakeUniqPerms.hs $(FLAGS) $(PROF)
 
 # The big boys.
 #
 FundamentalNeighbors: FundamentalNeighbors.hs Cyclotomic.o SublistPred.o Combinadics.o Perms.o Bound.o
 	$(CC) -o FundamentalNeighbors FundamentalNeighbors.hs Cyclotomic.o Bound.o SublistPred.o Combinadics.o Perms.o $(FLAGS) $(PACKAGES) $(PROF)
+
+FundamentalNeighborsSimple: FundamentalNeighborsSimple.hs Cyclotomic.o Bound.o
+	$(CC) -o FundamentalNeighborsSimple FundamentalNeighborsSimple.hs Cyclotomic.o Bound.o $(FLAGS) $(PACKAGES) $(PROF)
 
 Simplify: Simplify.hs
 	$(CC) -o Simplify Simplify.hs $(FLAGS) $(PACKAGES) $(PROF)

@@ -148,7 +148,7 @@ approx (CycloVal x gamma y) = (approx x) + (sqrt $ approx gamma) * (approx y)
   squared of a cyclotome.
 -}
 mag2 :: Cyclotome -> ConvergingReal
-mag2 c = r*r + i*i
+mag2 c = (powCR r 2) + (powCR i 2) --make it clear we are squaring, not just multiplying, slight diff
                 where r = real c
                       i = imag c
 mag :: Cyclotome -> ConvergingReal
@@ -232,6 +232,10 @@ cycloOne   m = CycloVal (cycloOne  (m - 1)) (cycloGamma (m - 1)) (cycloZero (m -
 rootsOfUnity m = take (2^m) $ iterate (* (cycloGamma m)) (cycloOne m)
 
 
+pow2 = iterate (\ x -> (1+(fst x), 2 * (snd x))) (0,1) :: [(Integer, Integer)]
+-- if intLog2 r = L, then 2^L <= r < 2^(L+1)
+intLog2 :: Integer -> Integer
+intLog2 r = (fst $ head $ filter ((> r) . snd) pow2) - 1
 {-
   intLogBase return the smallest L such that r < b^(L+1)
 -}
@@ -247,25 +251,49 @@ intLogBase b r = fst $ head $ filter ((> r) . snd) pows'
 bound0SqrtI :: Integer -> Bound Rational
 bound0SqrtI 0 = Bound 0 0
 bound0SqrtI 1 = Bound 1 1
+bound0SqrtI x | x < 0 = error $ "Cannot take the sqrt of a negative number: " ++ (show x)
 bound0SqrtI x = Bound low up
-                where logx = intLogBase 2 x
+                where logx = intLog2 x
                       low = 2 ^ (logx `div` 2)
                       up = 2 * low
 bound0Sqrt :: Rational -> Bound Rational
 bound0Sqrt r = xb / yb
                  where xb = bound0SqrtI $ numerator r
                        yb = bound0SqrtI $ denominator r
+bound0SqrtB :: Bound Rational -> Bound Rational
+bound0SqrtB (Bound rl ru) = union (xbl / ybl) (xbu / ybu)
+                 where xbl = bound0SqrtI $ numerator rl
+                       ybl = bound0SqrtI $ denominator rl
+                       xbu = bound0SqrtI $ numerator ru
+                       ybu = bound0SqrtI $ denominator ru
 {- refines a bound on the square-root of a rational -}
 boundSqrt' :: Bound Rational -> Rational -> Bound Rational
 boundSqrt' (Bound low up) r = next 
                           where low' = r/up
+                                u0 = r/low -- always an upper
                                 up' = (up + low')/2 {- always greater than sqrt if up is -}
+                                u2 = (low + u0)/2 -- Also an upper bound
+                                up'' = min up' u2
                                 low'' = max low' low
-                                mid = (low'' + up')/2
+                                mid = (low'' + up'')/2
                                 next = case (compare (mid^2)  r) of
                                          EQ -> Bound mid mid
-                                         LT -> Bound mid up'
+                                         LT -> Bound mid up''
                                          GT -> Bound low'' mid
+boundSqrtBR :: Bound Rational -> Bound Rational -> Bound Rational
+{-
+  b0 : inital bound on the sqrt
+  b1 : bound on the number in question
+  assume: b0_lower <= sqrt(b1_lower) <= sqrt(b1_upper) <= b0_upper
+  returns a better bound than b0. -}
+boundSqrtBR (Bound low up) (Bound rl ru) = next
+                          where low' = rl/up
+                                low'' = max low' low
+                                up' = (up + ru/up)/2 {- always greater than sqrt if up is -}
+                                u2 = (low'' + ru/low'')/2 -- Also an upper bound
+                                up'' = min up' u2
+                                next = Bound low'' up''
+
 boundSqrtS :: Rational -> [Bound Rational]
 {- using this idea
 fibs = scanl (+) 0 (1:fibs)
@@ -298,4 +326,7 @@ boundSqrtB k (Bound l h) = Bound (lower (boundSqrt k l)) (upper (boundSqrt k h))
 boundSqrtS' x = [boundSqrt k x | k <- [0..]]
 
 -- This is an O(N^2) operation, not so great, avoid it...
-sqrtCR cr = ConvergingReal [boundSqrtB k b | (b,k) <- zip (toList cr) [0..]] 
+-- We go a little deeper on the sqrt bound, because the first few aren't very useful
+sqrtCR cr = ConvergingReal [boundSqrtB (k+2) b | (b,k) <- zip (toList cr) [0..]] 
+-- sqrtCR cr = ConvergingReal $ drop 2 $ scanl boundSqrtBR (bound0SqrtB (head aslist)) aslist
+--             where aslist = toList cr

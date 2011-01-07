@@ -24,9 +24,7 @@ import Ratio
 import Data.List
 import Data.Maybe
 
-import SublistPred
 import Cyclotomic
-import Perms
 import Bound
 
 
@@ -105,6 +103,11 @@ pBias :: ConvergingReal -> ConvergingReal -> [Cyclotome] -> Bool
 pBias b e x = (abs (x1 - b)) <= e
             where x1 = mag (rsum x)
 
+isSorted :: (Ord a) => [a] -> Bool
+isSorted [] = True
+isSorted [x] = True
+isSorted (x:xs) = (x <= head xs) && (isSorted xs)
+
 {-
   Main entry point.
 -}
@@ -113,16 +116,17 @@ main = do
     Command line arguments.
   -}
   args <- getArgs 
-  let check = if (length args) < 5
-              then error "usage: <d (dim)> <p (2^{th} roots)> <m (0=orth, 1=unbias)> <s (size)> <j (job)>"
+  let check = if (length args) < 3
+              --then error "usage: <d (dim)> <p (2^{th} roots)> <m (0=orth, 1=unbias)> <vec>"
+              then error "usage: <d (dim)> <p (2^{th} roots)> <m (0=orth, 1=unbias)>"
               else return ()
   check
-  let sD : sP : sM : sS : sJ : _ = args
-  let d = read sD :: Integer
-  let p = read sP :: Integer
-  let m = read sM :: Integer
-  let s = read sS :: Integer
-  let j = read sJ :: Integer
+  let sD : sP : sM : _ = args
+  let d = read sD :: Int
+  let dI = toInteger d
+  let p = read sP :: Int
+  let m = read sM :: Int
+  -- let vecT = read vec :: [Int]
   let n = 2^p
 
   {-
@@ -131,27 +135,17 @@ main = do
     If we are less than or equal to the lower bound, then we are less
     than or equal to the actual value
    -}
-  let err = (fromInteger (2*d)) * (abs (imag (cycloGamma (p+1))))
+  let err = (fromInteger (2*dI)) * (abs (imag (cycloGamma (p+1))))
   -- Pop the first several off so we the bound is more refined by the time we use it
-  let sqrt_d = sqrtCR (fromInteger d)
+  let sqrt_d = sqrtCR (fromInteger dI)
   {-
     The 2^pth roots of unity.
   -}
   let roots = rootsOfUnity p
+  let all_dims = [0..(n-1)]
+  let all_v = filter isSorted (sequence (take (d-1) (repeat all_dims)))
 
-
-  {-
-    Job size of 0 implies entire job.
-  -}
-  let maxSize = (sublistCount (d - 1) roots) - 1
-  let maxJobs = (sublistJobs (d - 1) roots s) - 1
-
-
-  {-
-    Convert a list of roots of unity to a list of indices in the list of all roots of unity.
-  -}
-  let lookup = map (\ x -> toInteger $ fromJust (findIndex (x ==) roots))
-
+  let intToCyc v = map (roots !!) v 
 
   {-
     All vectors of roots of unity that are orthogonal / unbiased to the unity vector, for
@@ -159,13 +153,12 @@ main = do
   -}
   let isOrth v = pOrth err ((cycloOne p):v) 
   let isUnbiased v = pBias sqrt_d err ((cycloOne p):v) 
-  let alwaysTrue v = True
-  let doesntHaveZero v = all ((cycloOne p) /=) v
 
-  --let rootsOrth = genericIndex (sublistPredP isOrth (d - 1) roots s) j
-  --let rootsOrth = genericIndex (sublistPredP alwaysTrue (d - 1) roots s) j
-  let rootsOrth = genericIndex (sublistPredP doesntHaveZero (d - 1) roots s) j
-  let rootsBias = genericIndex (sublistPredP isUnbiased (d - 1) roots s) j
+  --putStrLn $ "orth: " ++ (show ((isOrth . intToCyc) vecT))
+  --putStrLn $ "unb: " ++ (show ((isUnbiased . intToCyc) vecT))
+
+  let rootsOrth = filter (isOrth . intToCyc) all_v
+  let rootsBias = filter (isUnbiased . intToCyc) all_v 
 
   {-
     Select the desired list of vectors and form all permutations.
@@ -173,17 +166,7 @@ main = do
   let roots' = if   m == 0
               then rootsOrth
               else rootsBias
-  let vecs = map lookup roots'
-  let allVecs = lunions $ map permuteAllL vecs
-
-
   {-
     Output the list.
   -}
-  let o | s == (-1) = [putStrLn ("1 <= s <= " ++ (show $ maxSize))]
-        | (s < 1) || (s > maxSize) = [putStrLn ("Out of range.  1 <= s <= " ++ (show $ maxSize))]
-        | j == (-1) = [putStrLn ("0 <= j <= " ++ (show $ maxJobs))]
-        | (j < 0) || (j > maxJobs) = [putStrLn ("Out of range.  0 <= j <= " ++ (show $ maxJobs))]
-        | otherwise = map (putStrLn . show) allVecs
-  sequence_ o
-
+  sequence_ $ map (putStrLn . show) roots' 
